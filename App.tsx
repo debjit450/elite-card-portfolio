@@ -195,7 +195,7 @@ const App: React.FC = () => {
             <Lock className="w-4 h-4" />
           </div>
           <p className="text-[0.5rem] font-serif text-gray-600 tracking-[0.25em] uppercase">
-            Transacted Securely on The Ethereum Network
+            Transacted Securely on The Developer Network
           </p>
           <p className="text-[0.4rem] font-mono text-gray-700 mt-2 tracking-widest">
             NODE_REF: US-EAST-1A // LATENCY: 12ms
