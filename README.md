@@ -1,4 +1,4 @@
-# Luxury Interactive Portfolio — React
+# Elite Card Portfolio — React
 
 A unique personal portfolio built with React.  
 The design blends luxury aesthetics with interactive motion, featuring a credit-card-style business card, scan interaction, smooth section transitions and details showcase.
