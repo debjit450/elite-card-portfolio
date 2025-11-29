@@ -18,7 +18,13 @@ const styles = `
   }
 `;
 
-const StatementHeader: React.FC<{ title: string; subtitle: string; delay?: number }> = ({
+interface StatementHeaderProps {
+  title: string;
+  subtitle: string;
+  delay?: number;
+}
+
+const StatementHeader: React.FC<StatementHeaderProps> = ({
   title,
   subtitle,
   delay = 0
@@ -39,14 +45,23 @@ const StatementHeader: React.FC<{ title: string; subtitle: string; delay?: numbe
   </div>
 );
 
-const StatementRow: React.FC<{
+interface StatementRowProps {
   date: string;
   entity: string;
   description: string;
   amount?: string;
   tags?: string[];
   delay: number;
-}> = ({ date, entity, description, amount, tags, delay }) => (
+}
+
+const StatementRow: React.FC<StatementRowProps> = ({
+  date,
+  entity,
+  description,
+  amount,
+  tags,
+  delay
+}) => (
   <div
     className="group relative py-8 border-b border-white/[0.04] hover:bg-white/[0.02] transition-all duration-500 -mx-6 px-6 rounded-lg opacity-0 animate-print-in cursor-default"
     style={{ animationDelay: `${delay}ms` }}
@@ -90,12 +105,14 @@ const StatementRow: React.FC<{
   </div>
 );
 
-const AssetColumn: React.FC<{
+interface AssetColumnProps {
   icon: React.ReactNode;
   title: string;
   items: string[];
   delay: number;
-}> = ({ icon, title, items, delay }) => (
+}
+
+const AssetColumn: React.FC<AssetColumnProps> = ({ icon, title, items, delay }) => (
   <div
     className="space-y-4 opacity-0 animate-print-in p-6 border border-transparent hover:border-white/5 rounded-lg transition-colors hover:bg-white/[0.02] group"
     style={{ animationDelay: `${delay}ms` }}
@@ -114,12 +131,19 @@ const AssetColumn: React.FC<{
   </div>
 );
 
-const ProjectCard: React.FC<{
+interface ProjectCardProps {
   title: string;
   subtitle: string;
   bullets: string[];
   delay: number;
-}> = ({ title, subtitle, bullets, delay }) => (
+}
+
+const ProjectCard: React.FC<ProjectCardProps> = ({
+  title,
+  subtitle,
+  bullets,
+  delay
+}) => (
   <div
     className="opacity-0 animate-print-in group border border-white/[0.04] rounded-lg p-6 md:p-8 bg-white/[0.01] hover:bg-white/[0.03] transition-all duration-500 relative overflow-hidden"
     style={{ animationDelay: `${delay}ms` }}
@@ -150,7 +174,7 @@ export const Portfolio: React.FC = () => {
   return (
     <>
       <style>{styles}</style>
-      <div className="w-full max-w-5xl mx-auto bg-[#080808] border border-white/[0.05] p-8 md:p-20 rounded-[4px] shadow-2xl relative overflow-hidden">
+      <div className="w-full bg-[#080808] border border-white/[0.05] p-8 md:p-20 rounded-[4px] shadow-2xl relative overflow-hidden">
         {/* Scan line */}
         <div className="absolute top-0 left-0 w-full h-[1px] bg-white/10 animate-scan pointer-events-none opacity-20" />
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#cbb577]/20 to-transparent opacity-50" />
@@ -175,7 +199,11 @@ export const Portfolio: React.FC = () => {
 
         {/* Experience */}
         <section className="mb-24">
-          <StatementHeader title="Transaction History" subtitle="Professional Experience" delay={300} />
+          <StatementHeader
+            title="Transaction History"
+            subtitle="Professional Experience"
+            delay={300}
+          />
           <div className="space-y-2">
             <StatementRow
               date="DEC 2024 — SEP 2025"
@@ -198,7 +226,11 @@ export const Portfolio: React.FC = () => {
 
         {/* Skills */}
         <section className="mb-24">
-          <StatementHeader title="Asset Allocation" subtitle="Technical Capabilities" delay={600} />
+          <StatementHeader
+            title="Asset Allocation"
+            subtitle="Technical Capabilities"
+            delay={600}
+          />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <AssetColumn
               icon={<Code className="w-4 h-4" />}
@@ -282,11 +314,14 @@ export const Portfolio: React.FC = () => {
         >
           <div className="flex items-center gap-2 mb-4 justify-center md:justify-start">
             <Terminal className="w-3 h-3 text-gray-600" />
-            <span className="text-[0.5rem] font-mono text-gray-600 uppercase">End of Record</span>
+            <span className="text-[0.5rem] font-mono text-gray-600 uppercase">
+              End of Record
+            </span>
           </div>
-          <p className="text-[0.45rem] text-gray-700 font-serif leading-relaxed uppercase tracking-wider max-w-2xl mx-auto md:mx-0">
-            This document contains proprietary information. The skills and experience listed herein are verified assets of
-            Debjit Dey. Reproduction or distribution without express written consent is prohibited.
+          <p className="text-[0.45rem] text-gray-700CPu font-serif leading-relaxed uppercase tracking-wider max-w-2xl mx-auto md:mx-0">
+            This document contains proprietary information. The skills and experience listed
+            herein are verified assets of Debjit Dey. Reproduction or distribution without
+            express written consent is prohibited.
           </p>
         </div>
       </div>

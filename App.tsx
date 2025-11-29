@@ -1,10 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BusinessCard } from './components/BusinessCard';
 import { Portfolio } from './components/Portfolio';
 import { ChevronDown, Lock, CheckCircle2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  // Target is the actual scroll position, Current is the smoothed visual position
   const [scrollTarget, setScrollTarget] = useState(0);
   const [scrollCurrent, setScrollCurrent] = useState(0);
 
@@ -12,24 +11,28 @@ const App: React.FC = () => {
   const [sessionTime, setSessionTime] = useState('00:00:00');
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [triggerShake, setTriggerShake] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // --- 1. HEAVY PHYSICS LOOP ---
-  // This creates the "weight" of the card.
+  const SCROLL_HEIGHT = 5000;
+  const TRIGGER_POINT = 0.3;
+  const UNLOCK_POINT = 0.4;
+
+  // Initial loader
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 2300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Physics loop
   useEffect(() => {
     let animationFrameId: number;
 
     const animate = () => {
       setScrollCurrent((prev) => {
-        // We calculate the distance between where we want to be (target) and where we are (prev)
         const diff = scrollTarget - prev;
-
-        // STOP CONDITION: If we are very close, snap to target to save CPU
-        if (Math.abs(diff) < 0.0005) return scrollTarget;
-
-        // PHYSICS CALCULATION:
-        // 0.04 is the "Tension". Lower number = Heavier/Slower lag.
-        // This makes the card feel like it weighs 5kg instead of 5g.
-        return prev + diff * 0.04;
+        if (Math.abs(diff) < 0.0001) return scrollTarget;
+        const next = prev + diff * 0.05;
+        return Math.min(Math.max(next, 0), 1.05);
       });
       animationFrameId = requestAnimationFrame(animate);
     };
@@ -38,13 +41,16 @@ const App: React.FC = () => {
     return () => cancelAnimationFrame(animationFrameId);
   }, [scrollTarget]);
 
-  // --- 2. INPUT HANDLERS ---
+  // Scroll + mouse handlers
   useEffect(() => {
     const handleScroll = () => {
       const scrollY = window.scrollY;
-      // INCREASED DIVISOR: 1500px instead of 600px.
-      // This means you have to scroll more to move the card, allowing for "slow motion" control.
-      const progress = Math.min(scrollY / 1500, 1.2);
+      const docHeight = document.body.scrollHeight - window.innerHeight;
+      if (docHeight <= 0) {
+        setScrollTarget(0);
+        return;
+      }
+      const progress = Math.min(Math.max(scrollY / docHeight, 0), 1);
       setScrollTarget(progress);
     };
 
@@ -63,19 +69,17 @@ const App: React.FC = () => {
     };
   }, []);
 
-  // --- 3. LOGIC & TRIGGER EFFECTS ---
+  // Logic & timer
   useEffect(() => {
-    // Logic Lock
-    if (scrollCurrent > 0.82 && !isAuthorized) {
+    if (scrollCurrent > UNLOCK_POINT && !isAuthorized) {
       setIsAuthorized(true);
-      setTriggerShake(true); // Visual "Clunk"
+      setTriggerShake(true);
       setTimeout(() => setTriggerShake(false), 400);
     }
-    if (scrollCurrent < 0.6 && isAuthorized) {
+    if (scrollCurrent < TRIGGER_POINT && isAuthorized) {
       setIsAuthorized(false);
     }
 
-    // Timer
     const start = Date.now();
     const interval = setInterval(() => {
       const diff = Date.now() - start;
@@ -85,23 +89,53 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [scrollCurrent, isAuthorized]);
 
+  // Animation calculations
+  const insertProgress = Math.min(scrollCurrent / TRIGGER_POINT, 1);
 
-  // --- 4. CALCULATED TRANSFORMS ---
-  // The card moves up, tilts back, and scales down slightly to fit the "slot"
-  const cardTranslateY = -scrollCurrent * 75;
-  const cardRotateX = scrollCurrent * 35; // Reduced tilt for a tighter slot feeling
-  const cardScale = 1 - scrollCurrent * 0.12;
+  const baseCardTranslateY = 0 - insertProgress * 35;
+  const postUnlockProgress = Math.max(0, (scrollCurrent - UNLOCK_POINT) / 0.3);
+  const extraLift = Math.min(postUnlockProgress, 1) * 80;
+  const cardTranslateY = baseCardTranslateY - extraLift;
 
-  // Lighting Physics: The card gets much darker as it enters the slot
-  const cardBrightness = Math.max(0.3, 1 - scrollCurrent * 1.2);
+  const cardRotateX = insertProgress * 15;
+  const cardScale = 1 - insertProgress * 0.1;
+  const cardBrightness = 1 - insertProgress * 0.3;
 
-  // The "Scanner" beam intensity
-  const scannerIntensity = isAuthorized ? 0 : Math.max(0, Math.sin(scrollCurrent * Math.PI * 3) * 1.5);
+  const scanPhase = (scrollCurrent - TRIGGER_POINT) / (UNLOCK_POINT - TRIGGER_POINT);
+  const rawPortfolioOpacity = (scrollCurrent - UNLOCK_POINT) * 2.5;
+  const portfolioOpacity = Math.min(Math.max(rawPortfolioOpacity, 0), 1);
+  const portfolioTranslate = Math.max(0, (scrollCurrent - UNLOCK_POINT) * 50);
+
+  const titleOpacity = Math.max(0, 1 - insertProgress * 2);
+  const titleScale = 1 + insertProgress * 0.1;
+
+  const mainLayerOpacity = 1 - portfolioOpacity;
+  const cardOpacity = Math.max(0, 1 - (scrollCurrent - UNLOCK_POINT) * 4);
+  const isCardCompletelyGone = portfolioOpacity >= 0.95;
+
+  const isScanningBase = scrollCurrent > TRIGGER_POINT && scrollCurrent < UNLOCK_POINT;
+
+  // Old-money visual tuning: warm gold, no neon
+  const visualAuthorized = isAuthorized && portfolioOpacity < 0.4;
+  const visualScanning = isScanningBase && portfolioOpacity < 0.4;
+  const scannerIntensity = visualScanning ? Math.max(0, Math.sin(scanPhase * Math.PI * 4)) : 0;
+
+  // Portfolio entry: subtle scale, no blur
+  const portfolioScale = 0.96 + portfolioOpacity * 0.04;
+
+  const curtainOpacity = 1 - Math.min(Math.max((portfolioOpacity - 0.4) * 2.5, 0), 1);
+  const crestOpacity = Math.min(portfolioOpacity * 2, 1) * curtainOpacity;
+  const crestScale = 1 + (1 - portfolioOpacity) * 0.06;
+
+  // Side-rail visibility
+  const railOpacity = Math.min(Math.max((portfolioOpacity - 0.25) * 2, 0), 0.9);
 
   return (
-    <div className={`min-h-[250vh] w-full bg-[#020202] text-gray-300 font-sans selection:bg-[#cbb577]/30 overflow-x-hidden cursor-crosshair ${triggerShake ? 'animate-shake' : ''}`}>
-
-      {/* --- GLOBAL STYLES FOR SHAKE --- */}
+    <div
+      className={`w-full bg-[#020202] text-gray-300 font-sans selection:bg-[#cbb577]/30 cursor-crosshair ${triggerShake ? 'animate-shake' : ''
+        }`}
+      style={{ height: `${SCROLL_HEIGHT}px` }}
+    >
       <style>{`
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -111,155 +145,291 @@ const App: React.FC = () => {
           40%, 60% { transform: translateX(4px); }
         }
         .animate-shake { animation: shake 0.3s cubic-bezier(.36,.07,.19,.97) both; }
+        
+        .hide-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .hide-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        @keyframes loader-bar {
+          0% { transform: scaleX(0); transform-origin: left; opacity: 0.3; }
+          40% { transform: scaleX(0.9); opacity: 1; }
+          100% { transform: scaleX(1); opacity: 0.9; }
+        }
       `}</style>
 
-      {/* --- DYNAMIC BACKGROUND --- */}
-      <div
-        className="fixed inset-0 pointer-events-none z-0 transition-opacity duration-1000"
-        style={{
-          background: `radial-gradient(circle 1200px at ${cursorPos.x}% ${cursorPos.y}%, ${isAuthorized ? 'rgba(10, 30, 20, 0.4)' : 'rgba(20, 20, 25, 0.6)'}, #000000 100%)`
-        }}
-      />
+      <div className="fixed inset-0 overflow-hidden perspective-1000">
+        {/* Background */}
+        <div
+          className="absolute inset-0 pointer-events-none z-0 transition-opacity duration-1000"
+          style={{
+            background: `radial-gradient(
+              circle 1100px at ${cursorPos.x}% ${cursorPos.y}%,
+              ${visualAuthorized
+                ? 'rgba(120, 96, 52, 0.55)'
+                : 'rgba(18, 18, 20, 0.9)'
+              },
+              #000000 100%
+            )`
+          }}
+        />
 
-      {/* Noise Texture */}
-      <div className="fixed inset-0 pointer-events-none opacity-[0.05] z-0 mix-blend-overlay"
-        style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }}
-      />
+        {/* Noise Grain */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-[0.06] z-0 mix-blend-overlay"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`
+          }}
+        />
 
-      <div className="relative z-10 w-full max-w-4xl mx-auto px-6">
-
-        {/* --- HUD / STATUS --- */}
-        <div className="fixed top-6 left-6 md:left-12 flex flex-col gap-1 z-50 mix-blend-difference">
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full transition-all duration-700 ${isAuthorized ? 'bg-emerald-500 shadow-[0_0_20px_#10b981]' : 'bg-orange-500/50'}`} />
-            <span className={`font-mono text-[0.6rem] tracking-[0.2em] uppercase transition-colors duration-500 ${isAuthorized ? 'text-emerald-500' : 'text-gray-500'}`}>
-              {isAuthorized ? 'AUTHENTICATED' : 'LOCKED'}
+        {/* MAIN CONTENT WRAPPER (fades in after loader) */}
+        <div
+          className="relative z-10 w-full h-full flex flex-col items-center justify-center transition-opacity duration-700"
+          style={{
+            opacity: isLoading ? 0 : 1,
+            pointerEvents: isLoading ? 'none' : 'auto'
+          }}
+        >
+          {/* HUD */}
+          <div className="absolute top-6 left-6 md:left-12 flex flex-col gap-1 z-50 mix-blend-difference pointer-events-none">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-2 h-2 rounded-full transition-all duration-700 ${isAuthorized
+                  ? 'bg-[#e6c36a] shadow-[0_0_20px_rgba(230,195,106,0.9)]'
+                  : 'bg-orange-500/50'
+                  }`}
+              />
+              <span
+                className={`font-mono text-[0.6rem] tracking-[0.2em] uppercase transition-colors duration-500 ${isAuthorized ? 'text-[#e6c36a]' : 'text-gray-500'
+                  }`}
+              >
+                {isAuthorized ? 'ACCESS_GRANTED' : 'IDLE'}
+              </span>
+            </div>
+            <span className="font-mono text-[0.5rem] tracking-widest text-gray-700">
+              SESSION: {sessionTime}
             </span>
           </div>
-          <span className="font-mono text-[0.5rem] tracking-widest text-gray-700">
-            SESSION: {sessionTime}
-          </span>
-        </div>
 
-        {/* --- THE CARD READER TERMINAL --- */}
-        <div className="h-[100vh] flex flex-col items-center justify-center sticky top-0 perspective-1000">
-
-          {/* 1. The Physical "Slot" (Top overlay that hides the card) */}
-          <div
-            className="absolute top-0 left-0 right-0 h-[48vh] z-40 pointer-events-none flex flex-col justify-end items-center bg-gradient-to-b from-[#020202] via-[#020202] to-transparent"
-            style={{ opacity: scrollCurrent > 0.1 ? 1 : 0 }}
-          >
-            {/* The "Lip" of the reader */}
-            <div className="w-[360px] md:w-[460px] h-px bg-gradient-to-r from-transparent via-white/10 to-transparent relative">
-              <div className={`absolute inset-0 bg-emerald-500 blur-xl transition-opacity duration-500 ${isAuthorized ? 'opacity-30' : 'opacity-0'}`} />
-            </div>
-          </div>
-
-          {/* 2. Text / Instructions (Fades out) */}
-          <div
-            className="text-center space-y-6 mb-24 transition-all duration-500 ease-out will-change-transform"
-            style={{
-              opacity: 1 - scrollCurrent * 3,
-              transform: `translateY(${-scrollCurrent * 100}px) scale(${1 - scrollCurrent * 0.1})`
-            }}
-          >
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <Lock className="w-3 h-3 text-[#cbb577]" />
-              <div className="h-px w-12 bg-gradient-to-r from-transparent via-[#cbb577]/50 to-transparent" />
-              <span className="text-[0.5rem] font-mono tracking-[0.4em] text-[#cbb577] uppercase">
-                Secure Entry
-              </span>
-              <div className="h-px w-12 bg-gradient-to-r from-transparent via-[#cbb577]/50 to-transparent" />
-            </div>
-
-            <h1 className="text-4xl md:text-7xl font-display font-bold tracking-[0.15em] text-transparent bg-clip-text bg-gradient-to-b from-white via-gray-200 to-gray-600 drop-shadow-2xl">
-              DEBJIT DEY
-            </h1>
-          </div>
-
-          {/* 3. The Card Assembly */}
-          <div className="relative group perspective-1000 z-20">
-
-            {/* Authorization Flash (Behind card) */}
+          {/* MAIN INTERFACE (CARD + READER) */}
+          {!isCardCompletelyGone && (
             <div
-              className={`absolute inset-[-50%] bg-emerald-500/10 blur-[100px] rounded-full transition-opacity duration-1000 ${isAuthorized ? 'opacity-100' : 'opacity-0'}`}
-            />
-
-            {/* The Actual Card */}
-            <div
-              className="relative transition-transform duration-75 ease-linear will-change-transform"
+              className="relative w-full h-full flex flex-col items-center justify-center transition-all duration-700 ease-out"
               style={{
-                transform: `
-                  translateY(${cardTranslateY}vh) 
-                  scale(${cardScale}) 
-                  rotateX(${cardRotateX}deg)
-                `,
-                filter: `brightness(${cardBrightness}) grayscale(${isAuthorized ? 0 : 0.4})`,
+                opacity: mainLayerOpacity,
+                pointerEvents: portfolioOpacity > 0.2 ? 'none' : 'auto'
               }}
             >
-              <BusinessCard />
+              {/* Reader Slot */}
+              <div
+                className="absolute top-[25%] left-0 right-0 z-10 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-500"
+                style={{ opacity: insertProgress > 0.1 ? 1 : 0 }}
+              >
+                <div className="w-[300px] md:w-[460px] h-[2px] bg-gradient-to-r from-transparent via-white/30 to-transparent relative">
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-r from-[#b89b56]/30 via-[#e6c36a]/70 to-[#b89b56]/30 blur-[10px] rounded-full transition-opacity duration-400 ${visualAuthorized ? 'opacity-100' : 'opacity-0'
+                      }`}
+                  />
+                </div>
+                <div className="w-full h-[20vh] bg-gradient-to-b from-transparent to-[#020202]/0" />
+              </div>
 
-              {/* Scanline Effect (Over card) */}
-              {!isAuthorized && (
+              {/* Title */}
+              <div
+                className="absolute top-[20%] text-center space-y-4 z-0"
+                style={{
+                  opacity: titleOpacity,
+                  transform: `scale(${titleScale}) translateY(${-insertProgress * 100}px)`
+                }}
+              >
+                <div className="flex items-center justify-center gap-3 mb-2 opacity-60">
+                  <Lock className="w-3 h-3 text-[#cbb577]" />
+                  <span className="text-[0.5rem] font-mono tracking-[0.4em] text-[#cbb577] uppercase">
+                    Private Dossier
+                  </span>
+                </div>
+                <h1 className="text-4xl md:text-7xl font-display font-bold tracking-[0.1em] text-transparent bg-clip-text bg-gradient-to-b from-white via-white to-gray-600 drop-shadow-2xl">
+                  DEBJIT DEY
+                </h1>
+              </div>
+
+              {/* Card Container */}
+              <div className="relative group perspective-1000 z-20 mt-32 md:mt-16">
+                {/* Golden Success Glow behind card */}
                 <div
-                  className="absolute inset-x-0 h-[2px] bg-cyan-400/50 z-50 pointer-events-none shadow-[0_0_20px_rgba(34,211,238,0.6)]"
+                  className={`absolute inset-[-50%] bg-gradient-to-b from-[#e6c36a]/25 via-[#b89b56]/35 to-transparent blur-[120px] rounded-full transition-all duration-700 ${visualAuthorized ? 'opacity-100 scale-125' : 'opacity-0 scale-75'
+                    }`}
+                />
+
+                {/* Card */}
+                <div
+                  className="relative transition-transform duration-100 ease-out will-change-transform"
                   style={{
-                    top: `${(scrollCurrent * 100) % 100}%`, // Beam follows the card
-                    opacity: scannerIntensity,
+                    transform: `
+                      translateY(${cardTranslateY}vh) 
+                      scale(${cardScale}) 
+                      rotateX(${cardRotateX}deg)
+                    `,
+                    filter: `brightness(${cardBrightness})`,
+                    opacity: cardOpacity
+                  }}
+                >
+                  <BusinessCard />
+
+                  {/* Laser Scan – warm gold */}
+                  <div
+                    className="absolute left-[-10%] right-[-10%] h-[2px] bg-[#f5e3a5] z-50 pointer-events-none shadow-[0_0_15px_rgba(230,195,106,0.9)] mix-blend-screen"
+                    style={{
+                      top: `${Math.sin(Date.now() / 200) * 50 + 50}%`,
+                      opacity: scannerIntensity,
+                      display: visualScanning ? 'block' : 'none'
+                    }}
+                  />
+                </div>
+
+                {/* Floor Shadow */}
+                <div
+                  className="absolute -bottom-20 left-1/2 -translate-x-1/2 w-[60%] h-8 bg-black blur-2xl rounded-[100%] transition-all duration-300"
+                  style={{
+                    opacity: (1 - insertProgress) * 0.6 * (1 - portfolioOpacity),
+                    transform: `scale(${(1 - insertProgress) * (1 - portfolioOpacity)})`
                   }}
                 />
-              )}
+              </div>
+
+              {/* Identity Verified Badge */}
+              <div
+                className="absolute top-[45%] z-50 flex flex-col items-center gap-3 transition-all duration-700"
+                style={{
+                  opacity: visualAuthorized ? mainLayerOpacity : 0,
+                  transform: `translateY(${visualAuthorized ? 0 : 40}px) scale(${visualAuthorized ? 1 : 0.8
+                    })`
+                }}
+              >
+                <div className="p-3 rounded-full bg-black/85 border border-[#e6c36a]/50 backdrop-blur-md shadow-[0_0_30px_rgba(230,195,106,0.4)]">
+                  <CheckCircle2 className="w-8 h-8 text-[#e6c36a]" />
+                </div>
+                <div className="px-4 py-1 rounded-full bg-black/70 border border-[#e6c36a]/40">
+                  <span className="font-mono text-[0.6rem] tracking-[0.3em] text-[#e6c36a] uppercase">
+                    Identity Verified
+                  </span>
+                </div>
+              </div>
+
+              {/* Scroll Indicator */}
+              <div
+                className="absolute bottom-12 flex flex-col items-center gap-4 text-gray-500 transition-all duration-500 pointer-events-none"
+                style={{ opacity: Math.max(0, 1 - insertProgress * 5) * mainLayerOpacity }}
+              >
+                <div className="flex flex-col items-center gap-3 animate-pulse">
+                  <span className="text-[0.5rem] font-mono tracking-[0.3em] uppercase opacity-60">
+                    Scroll to Insert
+                  </span>
+                  <ChevronDown className="w-5 h-5 text-gray-500/50" />
+                </div>
+              </div>
             </div>
+          )}
 
-            {/* Floor Reflection/Shadow */}
-            <div
-              className="absolute -bottom-16 left-1/2 -translate-x-1/2 w-[60%] h-4 bg-black blur-xl rounded-[100%] transition-all duration-300"
-              style={{
-                opacity: (1 - scrollCurrent) * 0.8,
-                transform: `scale(${1 - scrollCurrent})`
-              }}
-            />
-          </div>
-
-          {/* 4. Success Indicator */}
+          {/* PORTFOLIO LAYER */}
           <div
-            className="absolute z-50 flex flex-col items-center gap-4 transition-all duration-700 delay-100"
+            className="absolute inset-0 z-40 flex flex-col items-center justify-start"
             style={{
-              opacity: isAuthorized ? 1 : 0,
-              transform: `translateY(${isAuthorized ? 0 : 30}px)`
+              opacity: portfolioOpacity,
+              pointerEvents: portfolioOpacity > 0.5 ? 'auto' : 'none'
             }}
           >
-            <div className="p-4 rounded-full bg-[#020202] border border-emerald-500/20 shadow-[0_0_40px_rgba(16,185,129,0.15)]">
-              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-            </div>
-            <span className="font-mono text-[0.6rem] tracking-[0.3em] text-emerald-600 uppercase">
-              Access Granted
-            </span>
-          </div>
+            {/* Side rails / frame */}
+            <div
+              className="pointer-events-none absolute inset-y-10 left-6 md:left-16 w-px bg-gradient-to-b from-transparent via-[#cbb577]/40 to-transparent"
+              style={{ opacity: railOpacity }}
+            />
+            <div
+              className="pointer-events-none absolute inset-y-10 right-6 md:right-16 w-px bg-gradient-to-b from-transparent via-[#cbb577]/40 to-transparent"
+              style={{ opacity: railOpacity }}
+            />
 
-          {/* 5. Scroll Prompt */}
-          <div
-            className="absolute bottom-12 flex flex-col items-center gap-4 text-gray-600 transition-all duration-500"
-            style={{ opacity: 1 - scrollCurrent * 4 }}
-          >
-            <div className="flex flex-col items-center gap-2 animate-pulse">
-              <span className="text-[0.5rem] font-mono tracking-[0.3em] uppercase opacity-40 text-gray-400">
-                Insert Card to Begin
+            {/* Bottom folio tag */}
+            <div
+              className="pointer-events-none absolute left-8 md:left-16 bottom-10 flex items-center gap-3"
+              style={{ opacity: railOpacity }}
+            >
+              <span className="h-px w-10 bg-[#cbb577]/40" />
+              <span className="text-[0.55rem] font-mono tracking-[0.3em] uppercase text-gray-500">
+                Folio No. 01
               </span>
-              <ChevronDown className="w-4 h-4 text-gray-500/30" />
+            </div>
+
+            {/* Actual portfolio content */}
+            <div
+              className="w-full h-full overflow-y-auto hide-scrollbar pt-[15vh] pb-[10vh] px-4"
+              style={{
+                transform: `translateY(${-portfolioTranslate}px) scale(${portfolioScale})`,
+                transition: 'transform 0.5s ease-out'
+              }}
+            >
+              <div className="max-w-5xl mx-auto min-h-screen">
+                <Portfolio />
+              </div>
             </div>
           </div>
         </div>
 
-        {/* --- PORTFOLIO CONTENT --- */}
-        <div className="relative z-30 min-h-screen bg-[#020202] border-t border-white/5 shadow-[0_-100px_150px_rgba(0,0,0,1)]">
-          <div style={{ opacity: isAuthorized ? 1 : 0, filter: isAuthorized ? 'none' : 'blur(20px)', transition: 'all 1.5s ease-out' }}>
-            <div className="pt-32">
-              <Portfolio />
+        {/* FULLSCREEN LOADER */}
+        <div
+          className="absolute inset-0 z-[60] flex items-center justify-center bg-[#050505]"
+          style={{
+            opacity: isLoading ? 1 : 0,
+            pointerEvents: isLoading ? 'auto' : 'none',
+            transition: 'opacity 0.6s ease-out'
+          }}
+        >
+          <div className="max-w-sm w-full px-8">
+            <div className="flex flex-col items-center gap-6">
+              {/* Crest */}
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full border border-[#cbb577]/40 bg-gradient-to-b from-[#111111] via-[#050505] to-black flex items-center justify-center shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+                  <span className="font-serif text-lg tracking-[0.25em] text-[#e6c36a]">
+                    DD
+                  </span>
+                </div>
+                <div className="absolute inset-[-8px] rounded-full border border-[#cbb577]/20 opacity-60" />
+              </div>
+
+              {/* Text */}
+              <div className="text-center space-y-2">
+                <p className="text-[0.6rem] font-mono tracking-[0.35em] uppercase text-[#8d835c]">
+                  Establishing Secure Session
+                </p>
+                <p className="text-sm md:text-base font-serif text-gray-200 tracking-[0.18em] uppercase">
+                  Debjit Dey — Private Portfolio
+                </p>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full mt-2">
+                <div className="w-full h-[1px] bg-white/5 mb-1" />
+                <div className="w-full h-[3px] bg-black/70 border border-[#cbb577]/25 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#a4853b] via-[#e6c36a] to-[#a4853b]"
+                    style={{
+                      transform: 'scaleX(1)',
+                      transformOrigin: 'left',
+                      animation: 'loader-bar 2.1s ease-out forwards'
+                    }}
+                  />
+                </div>
+                <p className="mt-3 text-[0.55rem] font-mono tracking-[0.22em] text-gray-600 text-center uppercase">
+                  Please wait
+                </p>
+              </div>
             </div>
           </div>
         </div>
-
+        {/* END LOADER */}
       </div>
     </div>
   );
