@@ -1,20 +1,37 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Luxury Interactive Portfolio — React
 
-# Run and deploy your AI Studio app
+A unique personal portfolio built with React.  
+The design blends luxury aesthetics with interactive motion, featuring a credit-card-style business card, scan interaction, smooth section transitions and details showcase.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/drive/1s5ESJMdeZ7V-MlfhfXpWsoduHaZnEQRW
+## Features
 
-## Run Locally
+- 3D-style interactive business card (tilt + scan effect using pure CSS + JS)
+- Portfolio sections with premium aesthetics
+- Loader on first visit
+- Parallax effect with Smooth scroll
+- Fully responsive across devices
+- Lightweight and dependency-minimal code structure
 
-**Prerequisites:**  Node.js
+---
 
+## Tech Stack
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- React (19)
+- TypeScript
+- Tailwind CSS
+- Vite
+- Lucide Icons
+
+No animation libraries — all interactions are built manually using CSS and pointer events.
+
+---
+
+## Getting Started
+
+```sh
+git clone https://github.com/<your-username>/<repo-name>.git
+cd <repo-name>
+npm install
+npm run dev
