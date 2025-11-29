@@ -223,19 +223,7 @@ const App: React.FC = () => {
                 pointerEvents: portfolioOpacity > 0.2 ? 'none' : 'auto'
               }}
             >
-              {/* Reader Slot */}
-              <div
-                className="absolute top-[25%] left-0 right-0 z-10 flex flex-col items-center justify-center pointer-events-none transition-opacity duration-500"
-                style={{ opacity: insertProgress > 0.1 ? 1 : 0 }}
-              >
-                <div className="w-[300px] md:w-[460px] h-[2px] bg-gradient-to-r from-transparent via-white/30 to-transparent relative">
-                  <div
-                    className={`absolute inset-0 bg-gradient-to-r from-[#b89b56]/30 via-[#e6c36a]/70 to-[#b89b56]/30 blur-[10px] rounded-full transition-opacity duration-400 ${visualAuthorized ? 'opacity-100' : 'opacity-0'
-                      }`}
-                  />
-                </div>
-                <div className="w-full h-[20vh] bg-gradient-to-b from-transparent to-[#020202]/0" />
-              </div>
+
 
               {/* Title */}
               <div
@@ -405,7 +393,7 @@ const App: React.FC = () => {
                   Establishing Secure Session
                 </p>
                 <p className="text-sm md:text-base font-serif text-gray-200 tracking-[0.18em] uppercase">
-                  Debjit Dey — Private Portfolio
+                  Debjit Dey — Developer Portfolio
                 </p>
               </div>
 
